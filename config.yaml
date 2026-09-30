@@ -1,0 +1,5 @@
+receptor: data/receptor.pdbqt
+crystal_ligand: data/crystal_ligand.pdbqt
+ligand_dir: data/ligands
+box: data/box.yaml
+exhaustiveness: 0      # BOTH - A wants 4 (fast), B wants 8 (accurate) - agree!
