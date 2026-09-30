@@ -2,4 +2,4 @@ receptor: data/receptor.pdbqt
 crystal_ligand: data/crystal_ligand.pdbqt
 ligand_dir: data/ligands
 box: data/box.yaml
-exhaustiveness: 0      # BOTH - A wants 4 (fast), B wants 8 (accurate) - agree!
+exhaustiveness: 4      # BOTH - agreed on 4: fast enough for class, enough for a clear ranking

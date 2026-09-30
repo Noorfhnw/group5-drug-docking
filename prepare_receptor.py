@@ -20,6 +20,15 @@ yaml.safe_dump({"center": [round(float(x), 2) for x in c.mean(0)],
 # receptor: Meeko's receptor preparation (protonates and writes PDBQT)
 subprocess.run([sys.executable, "-m", "meeko.cli.mk_prepare_receptor", "--read_pdb", "data/protein.pdb",
                 "-o", "data/receptor", "-p", "-a"], check=True)
-# crystal ligand as PDBQT for RMSD (template from SMILES so bond orders are right)
-subprocess.run(["mk_prepare_ligand.py", "-i", "data/crystal_ligand.pdb", "-o", "data/crystal_ligand.pdbqt"], check=True)
+# crystal ligand as PDBQT for RMSD. mk_prepare_ligand only reads sdf/mol2/mol, and the
+# X-ray ligand has no bond orders to convert from - but RMSD only needs heavy-atom
+# elements and coordinates, so write the PDBQT columns straight from the PDB records.
+with open("data/crystal_ligand.pdbqt", "w") as out:
+    for i, line in enumerate(ligand, start=1):
+        element = (line[76:78].strip() or line[12:16].strip()[0]).upper()
+        if element == "H":
+            continue
+        atype = element.capitalize() if element in ("CL", "BR") else element
+        out.write(f"{line[:66]}  0.000 {atype:<2}\n")
+    out.write("END\n")
 print("done:", open("data/box.yaml").read())

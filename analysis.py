@@ -22,7 +22,26 @@ from vina import Vina
 # ---------- BOTH ----------
 def load_box(config):
     """Return (center [x,y,z], size [x,y,z]) from data/box.yaml, using CONFIG for overrides."""
-    raise NotImplementedError
+    box_path = config.get("box", "data/box.yaml")
+    box = yaml.safe_load(open(box_path)) or {}
+
+    # config.yaml wins over box.yaml when it carries an explicit center/size
+    center = config.get("center") or box.get("center")
+    size = config.get("size") or box.get("size")
+
+    if center is None or size is None:
+        raise ValueError(
+            f"{box_path} has no center/size - run prepare_receptor.py first"
+        )
+
+    center = [float(x) for x in center]
+    size = [float(x) for x in size]
+    if len(center) != 3 or len(size) != 3:
+        raise ValueError("center and size must each have three values")
+    if any(s <= 0 for s in size):
+        raise ValueError(f"box size must be positive, got {size}")
+
+    return center, size
 
 
 # ---------- Student A ----------
@@ -146,15 +165,43 @@ def plot_ranking(scores, out="results/ranking.png"):
 # ---------- BOTH ----------
 def summary_sentence(rmsd, scores):
     """One sentence: redocking RMSD, and the rank of sotorasib among the six ligands."""
-    raise NotImplementedError
+    ranked = scores.sort_values("score").reset_index(drop=True)
+    hit = ranked[ranked["ligand"].str.lower().str.contains("sotorasib")]
+    if hit.empty:
+        raise ValueError("sotorasib not found among the docked ligands")
+
+    row = hit.iloc[0]
+    rank = int(row.get("rank", hit.index[0] + 1))
+    best_decoy = ranked.drop(index=hit.index[0])["score"].min()
+    return (
+        f"Redocking sotorasib into the KRAS G12C switch-II pocket reproduced the "
+        f"crystal pose to {rmsd:.2f} A heavy-atom RMSD, and Vina ranked it "
+        f"{rank} of {len(ranked)} ligands at {row['score']:.1f} kcal/mol "
+        f"(best decoy: {best_decoy:.1f} kcal/mol)."
+    )
 
 
 def main():
     center, size = load_box(CONFIG)
-    # Student A: redock sotorasib + RMSD -> results/redock.csv
-    # Student B: dock all + ranking plot
-    # After the merge: both, then print(summary_sentence(rmsd, scores))
-    raise NotImplementedError
+    receptor = CONFIG["receptor"]
+    exhaustiveness = int(CONFIG["exhaustiveness"])
+    os.makedirs("results", exist_ok=True)
+
+    # Student A: redock the crystal ligand and measure how well the pose is recovered
+    sotorasib = os.path.join(CONFIG["ligand_dir"], "sotorasib.pdbqt")
+    redock_score, redock_pose = dock_ligand(
+        receptor, sotorasib, center, size, exhaustiveness
+    )
+    rmsd = pose_rmsd(redock_pose, CONFIG["crystal_ligand"])
+    pd.DataFrame([{"ligand": "sotorasib", "score": redock_score, "rmsd": rmsd}]).to_csv(
+        "results/redock.csv", index=False
+    )
+
+    # Student B: dock the whole set and plot the ranking
+    scores = dock_all(receptor, CONFIG["ligand_dir"], center, size, exhaustiveness)
+    plot_ranking(scores)
+
+    print(summary_sentence(rmsd, scores))
 
 
 if __name__ == "__main__":
