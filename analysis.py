@@ -43,12 +43,47 @@ def pose_rmsd(pose_pdbqt, crystal_pdbqt):
 # ---------- Student B ----------
 def dock_all(receptor, ligand_dir, center, size, exhaustiveness):
     """Dock every *.pdbqt in ligand_dir. Return a DataFrame: ligand, score."""
-    raise NotImplementedError
+    ligands = sorted(glob.glob(os.path.join(ligand_dir, "*.pdbqt")))
+    if not ligands:
+        raise FileNotFoundError(f"no *.pdbqt ligands found in {ligand_dir}")
+
+    rows = []
+    for path in ligands:
+        name = os.path.splitext(os.path.basename(path))[0]
+        score, pose = dock_ligand(receptor, path, center, size, exhaustiveness)
+        rows.append({"ligand": name, "score": float(score)})
+
+        os.makedirs("results/poses", exist_ok=True)
+        with open(f"results/poses/{name}.pdbqt", "w") as fh:
+            fh.write(pose)
+
+    scores = pd.DataFrame(rows).sort_values("score").reset_index(drop=True)
+    scores["rank"] = np.arange(1, len(scores) + 1)
+    os.makedirs("results", exist_ok=True)
+    scores.to_csv("results/scores.csv", index=False)
+    return scores
 
 
 def plot_ranking(scores, out="results/ranking.png"):
     """Bar plot of Vina scores sorted best-first, sotorasib highlighted."""
-    raise NotImplementedError
+    ranked = scores.sort_values("score").reset_index(drop=True)
+    colours = ["#c0392b" if "sotorasib" in n.lower() else "#7f8c8d"
+               for n in ranked["ligand"]]
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.bar(ranked["ligand"], ranked["score"], color=colours)
+    ax.set_ylabel("Vina score (kcal/mol)")
+    ax.set_title("Docking ranking, KRAS G12C switch-II pocket (6OIM)")
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_ha("right")
+    ax.invert_yaxis()  # more negative = better, so best bar sits highest
+    fig.tight_layout()
+
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    return out
 
 
 # ---------- BOTH ----------
