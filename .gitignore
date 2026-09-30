@@ -2,5 +2,7 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .venv/
+data/
 results/*
 !results/.gitkeep
+
